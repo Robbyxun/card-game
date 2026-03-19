@@ -172,7 +172,7 @@
             padding: 6px;
             cursor: pointer;
             transition: transform 0.18s ease, box-shadow 0.18s ease;
-            margin-left: -28px;
+            margin-left: -28px; /* overridden by JS */
             border: 1px solid #ccc;
             flex-shrink: 0;
             position: relative;
@@ -180,7 +180,7 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        .card:first-child { margin-left: 0; }
+        .card:first-child { margin-left: 0 !important; }
 
         .card.red { color: #d32f2f; }
 
@@ -425,9 +425,18 @@
     function renderHand() {
         const el = document.getElementById('playerHand');
         el.innerHTML = '';
+
+        const n = playerHand.length;
+        const cardW = 62;
+        const availW = Math.min(window.innerWidth - 20, 600);
+        // 動態計算重疊量：讓所有牌剛好塞進可用寬度
+        let overlap = n > 1 ? Math.min(0, Math.floor((availW - cardW) / (n - 1) - cardW)) : 0;
+        overlap = Math.max(overlap, -52); // 最多重疊 52px，保留至少 10px 可見
+
         playerHand.forEach((c, i) => {
             const div = cardEl(c, true);
             div.classList.toggle('selected', selectedIdx.has(i));
+            if (i > 0) div.style.marginLeft = overlap + 'px';
             div.onclick = () => {
                 if (currentTurn !== 0) return;
                 if (selectedIdx.has(i)) selectedIdx.delete(i);
@@ -686,6 +695,8 @@
     }
 
     init();
+
+    window.addEventListener('resize', () => renderHand());
 </script>
 </body>
 </html>
