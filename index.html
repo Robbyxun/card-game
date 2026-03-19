@@ -5,75 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>大老二：經典單機版</title>
     <style>
-        /* 1. 基礎樣式與背景 */
         body { 
-            background: #1a4d1a; /* 深綠色絨布 */
+            background: #1a4d1a; 
             background-image: radial-gradient(#2e7d32 20%, #1a4d1a 80%);
             color: white; font-family: 'PingFang TC', sans-serif; 
             margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; 
             height: 100vh; overflow: hidden; 
         }
-
-        /* 2. 遊戲資訊區域 */
         .game-header { 
-            margin-top: 10px; background: rgba(0,0,0,0.5); padding: 10px 20px; 
-            border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); text-align: center;
+            margin-top: 20px; background: rgba(0,0,0,0.5); padding: 10px 20px; 
+            border-radius: 20px; text-align: center; z-index: 10;
         }
         #status { font-size: 1.2rem; font-weight: bold; color: #ffeb3b; }
         #pattern-tips { font-size: 0.9rem; color: #ddd; margin-top: 5px; height: 1.2rem; }
 
-        /* 3. 撲克牌區塊 (手機優化) */
         .hand-container {
-            position: absolute; bottom: 80px; left: 0; width: 100%;
+            position: absolute; bottom: 100px; left: 0; width: 100%;
             display: flex; justify-content: center; align-items: flex-end;
-            padding-bottom: 20px;
         }
         .hand { 
             display: flex; justify-content: center; 
-            --card-width: 14vw; /* 使用視窗寬度單位，適應不同螢幕 */
-            --card-height: calc(var(--card-width) * 1.45);
+            --card-width: 75px; 
+            --card-height: 110px;
         }
 
-        /* 4. 單張撲克牌樣式 (引入 SVG 外部資源) */
         .card { 
             width: var(--card-width); height: var(--card-height); 
-            background-size: contain; background-repeat: no-repeat;
-            cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;
-            margin-left: calc(var(--card-width) * -0.6); /* 疊牌效果 */
+            background-size: cover; background-repeat: no-repeat;
+            cursor: pointer; transition: transform 0.2s ease;
+            margin-left: -45px; /* 疊牌效果 */
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+            background-color: white; border-radius: 5px;
         }
         .card:first-child { margin-left: 0; }
+        .card.selected { transform: translateY(-30px); filter: drop-shadow(0 5px 15px rgba(255, 235, 59, 0.8)); }
 
-        /* 5. 選取牌的動畫效果 */
-        .card.selected { 
-            transform: translateY(-25px); 
-            filter: drop-shadow(0 5px 15px rgba(255, 235, 59, 0.8)); /* 黃色光暈 */
-        }
-
-        /* 6. 控制按鈕 */
-        .controls { 
-            position: absolute; bottom: 20px; display: flex; gap: 15px; 
-        }
+        .controls { position: absolute; bottom: 30px; display: flex; gap: 15px; }
         button { 
-            padding: 12px 35px; font-size: 1.1rem; cursor: pointer; border-radius: 30px; 
-            border: none; font-weight: bold; text-transform: uppercase;
-            transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            padding: 12px 35px; font-size: 1rem; cursor: pointer; border-radius: 30px; 
+            border: none; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
         #playBtn { background: #fbc02d; color: #333; }
-        #playBtn:disabled { background: #9e9e9e; color: #666; cursor: not-allowed; box-shadow: none; }
+        #playBtn:disabled { background: #9e9e9e; color: #666; opacity: 0.5; }
         #passBtn { background: rgba(255,255,255,0.2); color: white; border: 2px solid white; }
 
-        /* 手機直屏優化 */
         @media (max-width: 600px) {
-            .hand { --card-width: 18vw; }
-            .card { margin-left: calc(var(--card-width) * -0.7); }
+            .hand { --card-width: 60px; --card-height: 88px; }
+            .card { margin-left: -35px; }
         }
     </style>
 </head>
 <body>
 
 <div class="game-header">
-    <div id="status">正在洗牌...</div>
+    <div id="status">正在發牌...</div>
     <div id="pattern-tips"></div>
 </div>
 
@@ -87,24 +72,17 @@
 </div>
 
 <script>
-    // ==========================================
-    // 核心資料定義 (大腦)
-    // ==========================================
-    const suits = ['c', 'd', 'h', 's']; // 梅花, 方塊, 紅心, 黑桃 (♣♦♥♠)
-    const ranks = ['3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A', '2']; // 10用T表示
+    const suits = ['c', 'd', 'h', 's']; 
+    const ranks = ['3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A', '2'];
     const rankOrder = ['3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A', '2'];
-    const suitOrder = ['c', 'd', 'h', 's'];
-
-    // 引入開源撲克牌 SVG 圖庫 (來自 Google Hosted Libraries 或 GitHub)
-    const CARD_IMG_BASE = 'https://raw.githubusercontent.com/ycm/poker-cards/master/images/';
+    
+    // 使用更穩定的 CDN 連結
+    const CARD_IMG_BASE = 'https://cdn.jsdelivr.net/gh/ycm/poker-cards@master/images/';
 
     let playerHand = [];
     let selectedIndices = new Set();
-    let isFirstTurn = true; // 是否為首攻
+    let isFirstTurn = true;
 
-    // ==========================================
-    // 1. 初始化與發牌 (Initialization)
-    // ==========================================
     function initGame() {
         let deck = [];
         for (let r = 0; r < ranks.length; r++) {
@@ -112,157 +90,84 @@
                 deck.push({ rank: ranks[r], suit: suits[s], rVal: r, sVal: s });
             }
         }
-        // 洗牌 (Shuffle)
         deck.sort(() => Math.random() - 0.5);
-        
-        // 模擬發牌給玩家 (單機版只發給玩家，其餘牌蓋掉)
-        playerHand = deck.slice(0, 13);
-        
-        // 大老二排序邏輯：數字優先，花色次之
-        playerHand.sort((a, b) => (a.rVal * 4 + a.sVal) - (b.rVal * 4 + b.sVal));
-        
+        playerHand = deck.slice(0, 13).sort((a, b) => (a.rVal * 4 + a.sVal) - (b.rVal * 4 + b.sVal));
         renderHand();
         checkFirstTurn();
     }
 
-    // ==========================================
-    // 2. 介面渲染 (Rendering)
-    // ==========================================
     function renderHand() {
         const handEl = document.getElementById('playerHand');
         handEl.innerHTML = '';
-        
         playerHand.forEach((card, index) => {
             const div = document.createElement('div');
             div.className = `card ${selectedIndices.has(index) ? 'selected' : ''}`;
-            
-            // 建立圖片路徑 (例如: images/s2.svg 代表黑桃2)
             const imgName = `${card.suit}${card.rank}.svg`;
             div.style.backgroundImage = `url('${CARD_IMG_BASE}${imgName}')`;
-            
             div.onclick = () => toggleSelect(index);
             handEl.appendChild(div);
         });
-        
         updatePlayButton();
     }
 
     function toggleSelect(index) {
-        if (selectedIndices.has(index)) {
-            selectedIndices.delete(index);
-        } else {
-            // 大老二最多只能選 5 張
-            if (selectedIndices.size < 5) {
-                selectedIndices.add(index);
-            }
-        }
+        if (selectedIndices.has(index)) selectedIndices.delete(index);
+        else if (selectedIndices.size < 5) selectedIndices.add(index);
         renderHand();
     }
 
-    // ==========================================
-    // 3. 牌型檢查與出牌邏輯 (Game Logic)
-    // ==========================================
-    
-    // 計算單張牌強度 (0~51)
-    function getCardPower(card) {
-        return card.rVal * 4 + card.sVal;
-    }
-
-    // 核心判定 Checker
     const Checker = {
-        // 取得選中牌型名稱
         getPatternName(cards) {
             if (cards.length === 1) return "單張";
             if (cards.length === 2 && cards[0].rank === cards[1].rank) return "對子";
             if (cards.length === 5) {
-                if (this.isStraightFlush(cards)) return "同花順！";
-                if (this.isFourOfAKind(cards)) return "鐵支";
                 if (this.isFullHouse(cards)) return "葫蘆";
                 if (this.isFlush(cards)) return "同花";
                 if (this.isStraight(cards)) return "順子";
             }
             return "無效牌型";
         },
-
-        // 檢查順子 (5張數字連續)
         isStraight(cards) {
-            const sortedRanks = cards.map(c => c.rVal).sort((a,b)=>a-b);
-            // 特殊處理大老二順子規則（不包含跨越2-3的組合）
-            for (let i = 0; i < 4; i++) {
-                if (sortedRanks[i+1] !== sortedRanks[i] + 1) return false;
-            }
+            const rvals = cards.map(c => c.rVal).sort((a,b)=>a-b);
+            for (let i = 0; i < 4; i++) if (rvals[i+1] !== rvals[i] + 1) return false;
             return true;
         },
-        
         isFlush(cards) { return cards.every(c => c.suit === cards[0].suit); },
-        isFullHouse(cards) { const counts = this.getRankCounts(cards); return counts.includes(3) && counts.includes(2); },
-        isFourOfAKind(cards) { const counts = this.getRankCounts(cards); return counts.includes(4); },
-        isStraightFlush(cards) { return this.isStraight(cards) && this.isFlush(cards); },
-
-        getRankCounts(cards) {
+        isFullHouse(cards) {
             const counts = {};
             cards.forEach(c => counts[c.rank] = (counts[c.rank] || 0) + 1);
-            return Object.values(counts);
+            const vals = Object.values(counts);
+            return vals.includes(3) && vals.includes(2);
         }
     };
 
     function updatePlayButton() {
-        const playBtn = document.getElementById('playBtn');
-        const tipsEl = document.getElementById('pattern-tips');
         const selectedCards = Array.from(selectedIndices).map(i => playerHand[i]);
-        
-        if (selectedCards.length === 0) {
-            tipsEl.innerText = "";
-            playBtn.disabled = true;
-            return;
-        }
-
         const pattern = Checker.getPatternName(selectedCards);
-        tipsEl.innerText = `目前選取：${pattern}`;
-        
-        // 基礎規則：必須是有效牌型
+        document.getElementById('pattern-tips').innerText = selectedCards.length > 0 ? `目前選取：${pattern}` : "";
         let canPlay = (pattern !== "無效牌型");
-        
-        // 首攻規則：必須包含梅花 3 (3c)
         if (isFirstTurn && canPlay) {
-            const hasClub3 = selectedCards.some(c => c.rank === '3' && c.suit === 'c');
-            if (!hasClub3) canPlay = false;
+            if (!selectedCards.some(c => c.rank === '3' && c.suit === 'c')) canPlay = false;
         }
-        
-        playBtn.disabled = !canPlay;
+        document.getElementById('playBtn').disabled = !canPlay;
     }
 
     function checkFirstTurn() {
         const hasClub3 = playerHand.some(c => c.rank === '3' && c.suit === 'c');
-        if (hasClub3) {
-            document.getElementById('status').innerText = "你有梅花 3，請首攻！";
-        } else {
-            document.getElementById('status').innerText = "遊戲開始 (單機練習模式)";
-            isFirstTurn = false; // 這裡簡化單機版邏輯，如果玩家沒梅花3就直接開始
-        }
+        document.getElementById('status').innerText = hasClub3 ? "你有梅花 3，請首攻！" : "遊戲開始！";
     }
 
-    // ==========================================
-    // 4. 按鈕事件
-    // ==========================================
     document.getElementById('playBtn').onclick = () => {
-        const selectedCards = Array.from(selectedIndices).map(i => playerHand[i]);
-        const pattern = Checker.getPatternName(selectedCards);
-        
-        // 這裡暫時只做 UI 移除，不做電腦比牌邏輯
         playerHand = playerHand.filter((_, i) => !selectedIndices.has(i));
         selectedIndices.clear();
-        
-        isFirstTurn = false; // 首攻完成
-        document.getElementById('status').innerText = `你出了: ${pattern} (請 Pass 讓電腦出牌)`;
-        
+        isFirstTurn = false;
+        document.getElementById('status').innerText = "出牌成功！(單機練習模式)";
         renderHand();
     };
 
     document.getElementById('passBtn').onclick = () => {
         if (isFirstTurn) return alert("首攻不能 Pass！");
         alert("單機版 Pass，下一輪由你開始。");
-        document.getElementById('status').innerText = "重新開始，你選張數";
         selectedIndices.clear();
         renderHand();
     }
