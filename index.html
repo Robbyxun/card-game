@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>大老二：正式版</title>
+    <title>大老二：修復完成版</title>
     <style>
         body { 
             background: #1a4d1a; background-image: radial-gradient(#2e7d32 20%, #1a4d1a 80%);
@@ -11,46 +11,44 @@
             margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; 
             height: 100vh; overflow: hidden; 
         }
-        .game-header { margin-top: 20px; background: rgba(0,0,0,0.6); padding: 15px 25px; border-radius: 20px; text-align: center; width: 80%; }
+        .game-header { margin-top: 20px; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 20px; text-align: center; width: 85%; }
         #status { font-size: 1.2rem; font-weight: bold; color: #ffeb3b; }
-        #pattern-tips { font-size: 1rem; color: #fff; margin-top: 5px; height: 1.2rem; background: rgba(255,255,255,0.1); border-radius: 5px; }
+        #pattern-tips { font-size: 1rem; color: #fff; margin-top: 5px; height: 1.2rem; }
 
-        .hand-container { position: absolute; bottom: 110px; left: 0; width: 100%; display: flex; justify-content: center; }
+        .hand-container { position: absolute; bottom: 120px; left: 0; width: 100%; display: flex; justify-content: center; }
         .hand { display: flex; justify-content: center; --card-width: 75px; --card-height: 115px; }
 
-        /* 卡片設計 */
         .card { 
             width: var(--card-width); height: var(--card-height); 
             background: white; border-radius: 8px; color: #333;
             display: flex; flex-direction: column; justify-content: space-between; padding: 10px; box-sizing: border-box;
-            cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s; margin-left: -45px;
+            cursor: pointer; transition: transform 0.2s ease; margin-left: -45px;
             box-shadow: 2px 5px 15px rgba(0,0,0,0.4); border: 1px solid #ccc;
         }
+        .card:first-child { margin-left: 0; }
         .card.red { color: #d32f2f; }
         .card.selected { transform: translateY(-35px); box-shadow: 0 0 20px #ffeb3b; border: 2px solid #ffeb3b; }
         
-        .card .rank-top { font-size: 1.4rem; font-weight: 900; line-height: 1; }
+        .card .rank-top { font-size: 1.4rem; font-weight: 900; line-height: 1; text-align: left; }
         .card .suit-center { font-size: 2.5rem; align-self: center; margin-top: -5px; }
         .card .rank-bottom { font-size: 1rem; font-weight: bold; align-self: flex-end; transform: rotate(180deg); }
         
-        .controls { position: absolute; bottom: 35px; display: flex; gap: 20px; }
-        button { padding: 12px 40px; font-size: 1.1rem; cursor: pointer; border-radius: 30px; border: none; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .controls { position: absolute; bottom: 40px; display: flex; gap: 20px; }
+        button { padding: 12px 40px; font-size: 1.1rem; cursor: pointer; border-radius: 30px; border: none; font-weight: bold; }
         #playBtn { background: #fbc02d; color: #333; }
-        #playBtn:disabled { background: #666; color: #999; opacity: 0.5; box-shadow: none; }
+        #playBtn:disabled { background: #666; color: #999; opacity: 0.5; }
         #passBtn { background: rgba(255,255,255,0.2); color: white; border: 2px solid white; }
 
         @media (max-width: 600px) {
             .hand { --card-width: 62px; --card-height: 95px; }
-            .card { margin-left: -38px; padding: 6px; }
-            .card .suit-center { font-size: 2rem; }
-            .card .rank-top { font-size: 1.2rem; }
+            .card { margin-left: -38px; }
         }
     </style>
 </head>
 <body>
 
 <div class="game-header">
-    <div id="status">準備中...</div>
+    <div id="status">正在發牌...</div>
     <div id="pattern-tips"></div>
 </div>
 
@@ -73,6 +71,78 @@
     let isFirstTurn = true;
 
     function initGame() {
-        let deck = [];
-        for (let r = 0; r < rankLabels.length; r++) {
-            for (let s = 0
+        try {
+            let deck = [];
+            for (let r = 0; r < rankLabels.length; r++) {
+                for (let s = 0; s < suits.length; s++) {
+                    deck.push({ label: rankLabels[r], suit: suits[s], rVal: r, sVal: s });
+                }
+            }
+            deck.sort(() => Math.random() - 0.5);
+            playerHand = deck.slice(0, 13).sort((a, b) => (a.rVal * 4 + a.sVal) - (b.rVal * 4 + b.sVal));
+            renderHand();
+            checkFirstTurn();
+        } catch (e) {
+            console.error(e);
+            document.getElementById('status').innerText = "發生錯誤，請重新整理";
+        }
+    }
+
+    function renderHand() {
+        const handEl = document.getElementById('playerHand');
+        handEl.innerHTML = '';
+        playerHand.forEach((card, index) => {
+            const isRed = (card.suit === 'd' || card.suit === 'h');
+            const div = document.createElement('div');
+            div.className = `card ${isRed ? 'red' : ''} ${selectedIndices.has(index) ? 'selected' : ''}`;
+            div.innerHTML = `
+                <div class="rank-top">${card.label}</div>
+                <div class="suit-center">${suitSymbols[card.suit]}</div>
+                <div class="rank-bottom">${card.label}</div>
+            `;
+            div.onclick = () => toggleSelect(index);
+            handEl.appendChild(div);
+        });
+        updatePlayButton();
+    }
+
+    function toggleSelect(index) {
+        if (selectedIndices.has(index)) selectedIndices.delete(index);
+        else if (selectedIndices.size < 5) selectedIndices.add(index);
+        renderHand();
+    }
+
+    const Checker = {
+        getPatternName(cards) {
+            if (cards.length === 1) return "單張";
+            if (cards.length === 2 && cards[0].label === cards[1].label) return "對子";
+            if (cards.length === 5) {
+                if (this.isFullHouse(cards)) return "葫蘆";
+                if (this.isFlush(cards) && this.isStraight(cards)) return "同花順！";
+                if (this.isFlush(cards)) return "同花";
+                if (this.isStraight(cards)) return "順子";
+            }
+            return "無效牌型";
+        },
+        isStraight(cards) {
+            const rvals = cards.map(c => c.rVal).sort((a,b)=>a-b);
+            for (let i = 0; i < 4; i++) if (rvals[i+1] !== rvals[i] + 1) return false;
+            return true;
+        },
+        isFlush(cards) { return cards.every(c => c.suit === cards[0].suit); },
+        isFullHouse(cards) {
+            const counts = {};
+            cards.forEach(c => counts[c.label] = (counts[c.label] || 0) + 1);
+            const vals = Object.values(counts);
+            return vals.includes(3) && vals.includes(2);
+        }
+    };
+
+    function updatePlayButton() {
+        const selectedCards = Array.from(selectedIndices).map(i => playerHand[i]);
+        const pattern = Checker.getPatternName(selectedCards);
+        const tipsEl = document.getElementById('pattern-tips');
+        tipsEl.innerText = selectedCards.length > 0 ? `牌型：${pattern}` : "";
+        let canPlay = (pattern !== "無效牌型");
+        if (isFirstTurn && canPlay) {
+            if (!selectedCards.some(c
