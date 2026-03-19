@@ -144,19 +144,24 @@
             position: relative;
             z-index: 10;
             width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
+            overflow-x: auto;
+            overflow-y: visible;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
             padding-bottom: 8px;
-            min-height: 140px;
+            min-height: 150px;
+            display: flex;
+            align-items: flex-end;
         }
+        .hand-wrapper::-webkit-scrollbar { display: none; }
 
         .hand {
             display: flex;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: flex-end;
             flex-wrap: nowrap;
-            padding: 0 10px;
+            padding: 0 16px;
+            min-width: max-content;
         }
 
         /* ─── Cards ─── */
@@ -344,7 +349,7 @@
     </div>
 
     <!-- Player Hand -->
-    <div class="hand-wrapper">
+    <div class="hand-wrapper" id="handWrapper">
         <div class="hand" id="playerHand"></div>
     </div>
 
@@ -424,18 +429,49 @@
 
     function renderHand() {
         const el = document.getElementById('playerHand');
+        const wrapper = document.getElementById('handWrapper');
         el.innerHTML = '';
 
         const n = playerHand.length;
-        const cardW = 62;
-        const availW = Math.min(window.innerWidth - 20, 600);
-        // 動態計算重疊量：讓所有牌剛好塞進可用寬度
-        let overlap = n > 1 ? Math.min(0, Math.floor((availW - cardW) / (n - 1) - cardW)) : 0;
-        overlap = Math.max(overlap, -52); // 最多重疊 52px，保留至少 10px 可見
+        if (n === 0) { updateBtn(); return; }
+
+        const screenW = window.innerWidth;
+        const minCardW = 42;   // 最小牌寬（縮小極限）
+        const maxCardW = 62;   // 正常牌寬
+        const minOverlap = -52; // 最大重疊（露出最少）
+
+        // 先嘗試用正常尺寸 + 動態重疊
+        let cardW = maxCardW;
+        let overlap = n > 1 ? Math.min(0, Math.floor((screenW - 32 - cardW) / (n - 1) - cardW)) : 0;
+
+        // 如果重疊超過極限，縮小牌的尺寸
+        if (overlap < minOverlap) {
+            // 算出用最大重疊時需要多寬的牌
+            // totalW = cardW + (n-1)*(cardW+minOverlap) = screenW-32
+            // cardW*(1 + n-1) + (n-1)*minOverlap = screenW-32
+            // cardW*n = screenW-32 - (n-1)*minOverlap
+            cardW = Math.max(minCardW, Math.floor((screenW - 32 - (n - 1) * minOverlap) / n));
+            overlap = minOverlap;
+        }
+
+        // 如果縮到最小還塞不下，啟用 scroll
+        const totalW = cardW + (n - 1) * (cardW + overlap);
+        const needsScroll = totalW > screenW - 20;
+
+        const cardH = Math.round(cardW * 95 / 62);
+        const fontSize = Math.round(cardW * 1.05 / 62 * 16);
+        const suitSize = Math.round(cardW * 1.9 / 62 * 16);
 
         playerHand.forEach((c, i) => {
             const div = cardEl(c, true);
             div.classList.toggle('selected', selectedIdx.has(i));
+            // 套用動態尺寸
+            div.style.width = cardW + 'px';
+            div.style.height = cardH + 'px';
+            div.style.borderRadius = Math.round(cardW * 9 / 62) + 'px';
+            div.querySelector('.rank-top').style.fontSize = fontSize + 'px';
+            div.querySelector('.suit-center').style.fontSize = suitSize + 'px';
+            div.querySelector('.rank-bot').style.fontSize = fontSize + 'px';
             if (i > 0) div.style.marginLeft = overlap + 'px';
             div.onclick = () => {
                 if (currentTurn !== 0) return;
@@ -446,6 +482,36 @@
             };
             el.appendChild(div);
         });
+
+        // scroll 模式：wrapper 開啟橫向滾動
+        if (needsScroll) {
+            wrapper.style.overflowX = 'auto';
+            el.style.justifyContent = 'flex-start';
+            el.style.paddingLeft = '10px';
+            el.style.paddingRight = '10px';
+            el.style.minWidth = 'max-content';
+        } else {
+            wrapper.style.overflowX = 'hidden';
+            el.style.justifyContent = 'center';
+            el.style.paddingLeft = '0';
+            el.style.paddingRight = '0';
+            el.style.minWidth = '';
+        }
+
+        // 滑動提示
+        let hint = document.getElementById('scrollHint');
+        if (needsScroll) {
+            if (!hint) {
+                hint = document.createElement('div');
+                hint.id = 'scrollHint';
+                hint.innerText = '← 左右滑動查看手牌 →';
+                hint.style.cssText = 'text-align:center;font-size:0.7rem;color:rgba(255,255,255,0.45);padding:2px 0;';
+                wrapper.parentNode.insertBefore(hint, wrapper.nextSibling);
+            }
+        } else if (hint) {
+            hint.remove();
+        }
+
         updateBtn();
     }
 
