@@ -3,115 +3,685 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>大老二：修復版</title>
+    <title>大老二</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { background: #1a4d1a; color: white; font-family: Arial, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
-        .game-header { margin-top: 20px; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 20px; text-align: center; width: 85%; }
-        #status { font-size: 1.2rem; font-weight: bold; color: #ffeb3b; }
-        .hand-container { position: absolute; bottom: 120px; left: 0; width: 100%; display: flex; justify-content: center; }
-        .hand { display: flex; justify-content: center; --card-width: 70px; }
-        .card { 
-            width: var(--card-width); height: 105px; background: white; border-radius: 8px; color: #333;
-            display: flex; flex-direction: column; justify-content: space-between; padding: 8px; box-sizing: border-box;
-            cursor: pointer; transition: transform 0.2s; margin-left: -40px; border: 1px solid #ccc;
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: radial-gradient(ellipse at center, #2d6a2d 0%, #1a4520 50%, #0d2b10 100%);
+            color: white;
+            font-family: 'Noto Sans TC', Arial, sans-serif;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
         }
+
+        /* Felt texture overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.03) 2px,
+                rgba(0,0,0,0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ─── Header ─── */
+        .game-header {
+            position: relative;
+            z-index: 10;
+            margin-top: 18px;
+            background: rgba(0,0,0,0.55);
+            backdrop-filter: blur(8px);
+            padding: 14px 28px;
+            border-radius: 16px;
+            text-align: center;
+            width: 90%;
+            max-width: 500px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #status {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #ffe066;
+            letter-spacing: 1px;
+        }
+
+        #tips {
+            font-size: 0.85rem;
+            margin-top: 4px;
+            color: rgba(255,255,255,0.7);
+            min-height: 1.2em;
+        }
+
+        /* ─── AI players area (top) ─── */
+        .ai-area {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            max-width: 600px;
+            margin-top: 14px;
+            padding: 0 10px;
+            gap: 10px;
+        }
+
+        .ai-player {
+            background: rgba(0,0,0,0.4);
+            border-radius: 12px;
+            padding: 8px 14px;
+            text-align: center;
+            flex: 1;
+            border: 1px solid rgba(255,255,255,0.08);
+            font-size: 0.8rem;
+        }
+
+        .ai-player .ai-name { font-weight: 700; color: #aaffaa; font-size: 0.85rem; }
+        .ai-player .ai-cards { color: rgba(255,255,255,0.6); margin-top: 2px; }
+
+        /* Mini card backs */
+        .card-back-row {
+            display: flex;
+            justify-content: center;
+            gap: -4px;
+            margin-top: 4px;
+        }
+
+        .mini-card {
+            width: 12px;
+            height: 18px;
+            background: linear-gradient(135deg, #1a3a8a, #2a50c0);
+            border-radius: 2px;
+            border: 1px solid rgba(255,255,255,0.3);
+            margin-left: -4px;
+        }
+        .mini-card:first-child { margin-left: 0; }
+
+        /* ─── Table center (last played cards) ─── */
+        .table-area {
+            position: relative;
+            z-index: 10;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .played-label {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.4);
+            white-space: nowrap;
+        }
+
+        .played-cards {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            justify-content: center;
+            min-height: 110px;
+            position: relative;
+        }
+
+        /* ─── Player hand area ─── */
+        .hand-wrapper {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 8px;
+            min-height: 140px;
+        }
+
+        .hand {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            flex-wrap: nowrap;
+            padding: 0 10px;
+        }
+
+        /* ─── Cards ─── */
+        .card {
+            width: 62px;
+            height: 95px;
+            background: white;
+            border-radius: 9px;
+            color: #222;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 6px;
+            cursor: pointer;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+            margin-left: -28px;
+            border: 1px solid #ccc;
+            flex-shrink: 0;
+            position: relative;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         .card:first-child { margin-left: 0; }
+
         .card.red { color: #d32f2f; }
-        .card.selected { transform: translateY(-30px); box-shadow: 0 0 15px #ffeb3b; border: 2px solid #ffeb3b; }
-        .card .rank-top { font-size: 1.2rem; font-weight: bold; }
-        .card .suit-center { font-size: 2.2rem; align-self: center; }
-        .controls { position: absolute; bottom: 40px; display: flex; gap: 20px; }
-        button { padding: 12px 30px; font-size: 1rem; cursor: pointer; border-radius: 30px; border: none; font-weight: bold; }
-        #playBtn { background: #fbc02d; }
-        #playBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-        #passBtn { background: rgba(255,255,255,0.2); color: white; border: 2px solid white; }
+
+        .card.selected {
+            transform: translateY(-28px) scale(1.05);
+            box-shadow: 0 8px 24px rgba(255, 224, 102, 0.6), 0 0 0 2px #ffe066;
+            z-index: 20;
+        }
+
+        .card:not(.selected):hover {
+            transform: translateY(-8px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+            z-index: 15;
+        }
+
+        .card .rank-top {
+            font-size: 1.05rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .card .suit-center {
+            font-size: 1.9rem;
+            align-self: center;
+            line-height: 1;
+        }
+
+        .card .rank-bot {
+            font-size: 1.05rem;
+            font-weight: 900;
+            line-height: 1;
+            text-align: right;
+            transform: rotate(180deg);
+        }
+
+        /* Played card (smaller, on table) */
+        .played-card {
+            width: 56px;
+            height: 84px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 5px;
+            border: 1px solid #ddd;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .played-card.red { color: #d32f2f; }
+        .played-card .rank-top { font-size: 0.9rem; font-weight: 900; }
+        .played-card .suit-center { font-size: 1.5rem; align-self: center; }
+        .played-card .rank-bot { font-size: 0.9rem; font-weight: 900; text-align: right; transform: rotate(180deg); }
+
+        /* ─── Controls ─── */
+        .controls {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            gap: 16px;
+            padding: 12px 0 20px;
+        }
+
+        button {
+            padding: 13px 36px;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 50px;
+            border: none;
+            font-weight: 700;
+            font-family: 'Noto Sans TC', Arial, sans-serif;
+            transition: transform 0.1s, opacity 0.2s, box-shadow 0.2s;
+            letter-spacing: 1px;
+        }
+
+        button:active { transform: scale(0.95); }
+
+        #playBtn {
+            background: linear-gradient(135deg, #ffe066, #fbc02d);
+            color: #333;
+            box-shadow: 0 4px 16px rgba(251,192,45,0.4);
+        }
+
+        #playBtn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        #passBtn {
+            background: rgba(255,255,255,0.12);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.35);
+        }
+
+        #passBtn:hover { background: rgba(255,255,255,0.2); }
+
+        /* ─── Win overlay ─── */
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .overlay.show { display: flex; }
+
+        .overlay h2 {
+            font-size: 2.5rem;
+            color: #ffe066;
+            text-shadow: 0 0 30px rgba(255,224,102,0.8);
+        }
+
+        .overlay button {
+            padding: 14px 40px;
+            background: #ffe066;
+            color: #333;
+            font-size: 1.1rem;
+        }
     </style>
 </head>
 <body>
+
+    <!-- Header -->
     <div class="game-header">
         <div id="status">發牌中...</div>
-        <div id="tips" style="font-size: 0.9rem; margin-top: 5px;"></div>
+        <div id="tips"></div>
     </div>
-    <div class="hand-container"><div class="hand" id="playerHand"></div></div>
+
+    <!-- AI Players -->
+    <div class="ai-area">
+        <div class="ai-player" id="ai1">
+            <div class="ai-name">玩家 2</div>
+            <div class="card-back-row" id="ai1Cards"></div>
+            <div class="ai-cards" id="ai1Count">13 張</div>
+        </div>
+        <div class="ai-player" id="ai2">
+            <div class="ai-name">玩家 3</div>
+            <div class="card-back-row" id="ai2Cards"></div>
+            <div class="ai-cards" id="ai2Count">13 張</div>
+        </div>
+        <div class="ai-player" id="ai3">
+            <div class="ai-name">玩家 4</div>
+            <div class="card-back-row" id="ai3Cards"></div>
+            <div class="ai-cards" id="ai3Count">13 張</div>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-area">
+        <div style="position:relative; text-align:center;">
+            <div class="played-label" id="playedByLabel"></div>
+            <div class="played-cards" id="playedCards"></div>
+        </div>
+    </div>
+
+    <!-- Player Hand -->
+    <div class="hand-wrapper">
+        <div class="hand" id="playerHand"></div>
+    </div>
+
+    <!-- Buttons -->
     <div class="controls">
         <button id="playBtn" disabled>出牌</button>
         <button id="passBtn">Pass</button>
     </div>
 
+    <!-- Win Overlay -->
+    <div class="overlay" id="overlay">
+        <h2 id="overlayMsg">🎉 你贏了！</h2>
+        <button onclick="location.reload()">再玩一局</button>
+    </div>
+
 <script>
-    const suitSym = { 'c': '♣', 'd': '♦', 'h': '♥', 's': '♠' };
-    const labels = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
-    const suits = ['c', 'd', 'h', 's'];
+    const suitSym = { c: '♣', d: '♦', h: '♥', s: '♠' };
+    const labels = ['3','4','5','6','7','8','9','10','J','Q','K','A','2'];
+    const suits = ['c','d','h','s'];
+
     let playerHand = [];
+    let aiHands = [[], [], []];
     let selectedIdx = new Set();
     let isFirst = true;
+    let lastPlayed = [];   // cards on table
+    let lastPlayedBy = ''; // who played them
+    let currentTurn = 0;   // 0 = player, 1/2/3 = AI
+    let passCount = 0;
 
+    // ─── Init ───
     function init() {
         let deck = [];
-        for (let r = 0; r < labels.length; r++) {
-            for (let s = 0; s < suits.length; s++) {
-                deck.push({ label: labels[r], suit: suits[s], rVal: r, sVal: s });
-            }
-        }
+        labels.forEach((label, r) => {
+            suits.forEach((suit, s) => {
+                deck.push({ label, suit, rVal: r, sVal: s });
+            });
+        });
         deck.sort(() => Math.random() - 0.5);
-        playerHand = deck.slice(0, 13).sort((a, b) => (a.rVal * 4 + a.sVal) - (b.rVal * 4 + b.sVal));
-        render();
-        const has3c = playerHand.some(c => c.label === '3' && c.suit === 'c');
-        document.getElementById('status').innerText = has3c ? "你有梅花 3，請首攻" : "遊戲開始";
+
+        playerHand = deck.slice(0, 13).sort(cardSort);
+        aiHands[0]  = deck.slice(13, 26).sort(cardSort);
+        aiHands[1]  = deck.slice(26, 39).sort(cardSort);
+        aiHands[2]  = deck.slice(39, 52).sort(cardSort);
+
+        // Who has ♣3 goes first
+        const has3c = (hand) => hand.some(c => c.label === '3' && c.suit === 'c');
+        if (has3c(playerHand))      currentTurn = 0;
+        else if (has3c(aiHands[0])) currentTurn = 1;
+        else if (has3c(aiHands[1])) currentTurn = 2;
+        else                         currentTurn = 3;
+
+        isFirst = true;
+        lastPlayed = [];
+        lastPlayedBy = '';
+        passCount = 0;
+
+        renderAll();
+
+        if (currentTurn === 0) {
+            setStatus('你有梅花 3，請首攻');
+        } else {
+            setStatus(`玩家 ${currentTurn + 1} 先出`);
+            setTimeout(aiTurn, 800);
+        }
     }
 
-    function render() {
+    function cardSort(a, b) {
+        return (a.rVal * 4 + a.sVal) - (b.rVal * 4 + b.sVal);
+    }
+
+    // ─── Render ───
+    function renderAll() {
+        renderHand();
+        renderAI();
+        renderTable();
+    }
+
+    function renderHand() {
         const el = document.getElementById('playerHand');
         el.innerHTML = '';
         playerHand.forEach((c, i) => {
-            const div = document.createElement('div');
-            div.className = `card ${(c.suit==='d'||c.suit==='h')?'red':''} ${selectedIdx.has(i)?'selected':''}`;
-            div.innerHTML = `<div class="rank-top">${c.label}</div><div class="suit-center">${suitSym[c.suit]}</div>`;
+            const div = cardEl(c, true);
+            div.classList.toggle('selected', selectedIdx.has(i));
             div.onclick = () => {
+                if (currentTurn !== 0) return;
                 if (selectedIdx.has(i)) selectedIdx.delete(i);
                 else if (selectedIdx.size < 5) selectedIdx.add(i);
-                render();
+                renderHand();
+                updateBtn();
             };
             el.appendChild(div);
         });
         updateBtn();
     }
 
+    function cardEl(c, full = true) {
+        const div = document.createElement('div');
+        div.className = `card ${(c.suit==='d'||c.suit==='h') ? 'red' : ''}`;
+        div.innerHTML = `
+            <div class="rank-top">${c.label}</div>
+            <div class="suit-center">${suitSym[c.suit]}</div>
+            <div class="rank-bot">${c.label}</div>
+        `;
+        return div;
+    }
+
+    function renderAI() {
+        aiHands.forEach((hand, i) => {
+            const count = hand.length;
+            const countEl = document.getElementById(`ai${i+1}Count`);
+            const cardsEl = document.getElementById(`ai${i+1}Cards`);
+            countEl.innerText = `${count} 張`;
+            cardsEl.innerHTML = '';
+            const show = Math.min(count, 8);
+            for (let j = 0; j < show; j++) {
+                const mc = document.createElement('div');
+                mc.className = 'mini-card';
+                cardsEl.appendChild(mc);
+            }
+        });
+    }
+
+    function renderTable() {
+        const el = document.getElementById('playedCards');
+        const lbl = document.getElementById('playedByLabel');
+        el.innerHTML = '';
+        lbl.innerText = lastPlayedBy ? `${lastPlayedBy} 出的` : '';
+        lastPlayed.forEach(c => {
+            const div = document.createElement('div');
+            div.className = `played-card ${(c.suit==='d'||c.suit==='h') ? 'red' : ''}`;
+            div.innerHTML = `
+                <div class="rank-top">${c.label}</div>
+                <div class="suit-center">${suitSym[c.suit]}</div>
+                <div class="rank-bot">${c.label}</div>
+            `;
+            el.appendChild(div);
+        });
+    }
+
+    // ─── Pattern detection ───
+    function getPattern(cards) {
+        if (!cards || cards.length === 0) return null;
+        const n = cards.length;
+        const sorted = [...cards].sort(cardSort);
+        const counts = {};
+        sorted.forEach(c => counts[c.label] = (counts[c.label]||0)+1);
+        const vals = Object.values(counts);
+
+        if (n === 1) return { type: 'single', power: sorted[0].rVal * 4 + sorted[0].sVal };
+        if (n === 2 && vals.every(v => v === 1) && sorted[0].label === sorted[1].label)
+            return { type: 'pair', power: sorted[1].rVal * 4 + sorted[1].sVal };
+        if (n === 3 && vals.every(v => v === 1) && sorted[0].label === sorted[1].label && sorted[1].label === sorted[2].label)
+            return { type: 'triple', power: sorted[2].rVal * 4 + sorted[2].sVal };
+        if (n === 5) {
+            // Straight flush > four of a kind > full house > flush > straight > ... 
+            // Simplified: just detect full house and flush for now
+            if (vals.includes(3) && vals.includes(2)) {
+                const tripleLabel = Object.keys(counts).find(k => counts[k] === 3);
+                const tripleCard = sorted.filter(c => c.label === tripleLabel);
+                return { type: 'fullhouse', power: tripleCard[2].rVal * 4 + tripleCard[2].sVal };
+            }
+            if (sorted.every(c => c.suit === sorted[0].suit)) {
+                return { type: 'flush', power: sorted[4].rVal * 4 + sorted[4].sVal };
+            }
+        }
+        return null;
+    }
+
+    function canBeat(play, last) {
+        if (!last || last.length === 0) return true; // free turn
+        if (play.length !== last.length) return false;
+        const p = getPattern(play);
+        const l = getPattern(last);
+        if (!p || !l) return false;
+        if (p.type !== l.type) return false;
+        return p.power > l.power;
+    }
+
+    // ─── Update button ───
     function updateBtn() {
         const sel = Array.from(selectedIdx).map(i => playerHand[i]);
         const btn = document.getElementById('playBtn');
         const tips = document.getElementById('tips');
+
         if (sel.length === 0) { tips.innerText = ''; btn.disabled = true; return; }
 
-        let pattern = "無效";
-        if (sel.length === 1) pattern = "單張";
-        else if (sel.length === 2 && sel[0].label === sel[1].label) pattern = "對子";
-        else if (sel.length === 5) {
-            const counts = {};
-            sel.forEach(c => counts[c.label] = (counts[c.label] || 0) + 1);
-            const v = Object.values(counts);
-            if (v.includes(3) && v.includes(2)) pattern = "葫蘆";
-            else if (sel.every(c => c.suit === sel[0].suit)) pattern = "同花";
-        }
-        
-        tips.innerText = "牌型：" + pattern;
-        let can = (pattern !== "無效");
-        if (isFirst && can && !sel.some(c => c.label === '3' && c.suit === 'c')) can = false;
+        const p = getPattern(sel);
+        if (!p) { tips.innerText = '牌型：無效'; btn.disabled = true; return; }
+
+        const typeNames = { single:'單張', pair:'對子', triple:'三條', fullhouse:'葫蘆', flush:'同花' };
+        tips.innerText = `牌型：${typeNames[p.type] || '未知'}`;
+
+        let can = true;
+        if (isFirst && !sel.some(c => c.label === '3' && c.suit === 'c')) can = false;
+        if (!isFirst && !canBeat(sel, lastPlayed)) can = false;
         btn.disabled = !can;
     }
 
+    function setStatus(msg) {
+        document.getElementById('status').innerText = msg;
+    }
+
+    // ─── Player play ───
     document.getElementById('playBtn').onclick = () => {
+        if (currentTurn !== 0) return;
+        const sel = Array.from(selectedIdx).map(i => playerHand[i]);
+        lastPlayed = sel;
+        lastPlayedBy = '你';
         playerHand = playerHand.filter((_, i) => !selectedIdx.has(i));
         selectedIdx.clear();
         isFirst = false;
-        document.getElementById('status').innerText = "出牌成功";
-        render();
+        passCount = 0;
+
+        renderAll();
+        setStatus('你出牌了');
+
+        if (playerHand.length === 0) {
+            showWin('🎉 你贏了！');
+            return;
+        }
+
+        currentTurn = 1;
+        setTimeout(aiTurn, 900);
     };
 
     document.getElementById('passBtn').onclick = () => {
-        if (isFirst) alert("首攻不能 Pass");
-        else { selectedIdx.clear(); render(); }
+        if (currentTurn !== 0) return;
+        if (isFirst) { alert('首攻不能 Pass'); return; }
+        selectedIdx.clear();
+        passCount++;
+        setStatus('你 Pass');
+
+        if (passCount >= 3) {
+            // everyone passed, table clears
+            lastPlayed = [];
+            lastPlayedBy = '';
+            passCount = 0;
+            renderTable();
+        }
+
+        currentTurn = 1;
+        setTimeout(aiTurn, 900);
     };
+
+    // ─── AI Turn ───
+    function aiTurn() {
+        const ai = currentTurn - 1; // 0-indexed
+        const hand = aiHands[ai];
+        const name = `玩家 ${currentTurn + 1}`;
+
+        // Try to play: find smallest valid play
+        let played = null;
+
+        if (isFirst) {
+            // Must include ♣3
+            const idx3c = hand.findIndex(c => c.label === '3' && c.suit === 'c');
+            played = [hand[idx3c]];
+        } else if (!lastPlayed || lastPlayed.length === 0) {
+            // Free turn – play smallest single
+            played = [hand[0]];
+        } else {
+            const n = lastPlayed.length;
+            // Try to find n cards that beat last played
+            if (n === 1) {
+                for (let c of hand) {
+                    if (canBeat([c], lastPlayed)) { played = [c]; break; }
+                }
+            } else if (n === 2) {
+                // Find pairs
+                for (let i = 0; i < hand.length - 1; i++) {
+                    if (hand[i].label === hand[i+1].label) {
+                        const pair = [hand[i], hand[i+1]];
+                        if (canBeat(pair, lastPlayed)) { played = pair; break; }
+                    }
+                }
+            } else if (n === 5) {
+                // Full houses
+                const counts = {};
+                hand.forEach(c => counts[c.label] = (counts[c.label]||0)+1);
+                for (const [label, cnt] of Object.entries(counts)) {
+                    if (cnt >= 3) {
+                        const triple = hand.filter(c => c.label === label).slice(0, 3);
+                        const pair = hand.filter(c => c.label !== label && counts[c.label] >= 2);
+                        if (pair.length >= 2) {
+                            const combo = [...triple, pair[0], pair[1]];
+                            if (canBeat(combo, lastPlayed)) { played = combo; break; }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (played) {
+            // Remove played cards from AI hand
+            let remaining = [...hand];
+            for (const pc of played) {
+                const idx = remaining.findIndex(c => c.label === pc.label && c.suit === pc.suit);
+                if (idx !== -1) remaining.splice(idx, 1);
+            }
+            aiHands[ai] = remaining;
+            lastPlayed = played;
+            lastPlayedBy = name;
+            isFirst = false;
+            passCount = 0;
+
+            setStatus(`${name} 出了 ${played.length} 張`);
+            renderAll();
+
+            if (aiHands[ai].length === 0) {
+                showWin(`😭 ${name} 贏了...`);
+                return;
+            }
+        } else {
+            setStatus(`${name} Pass`);
+            passCount++;
+            if (passCount >= 3) {
+                lastPlayed = [];
+                lastPlayedBy = '';
+                passCount = 0;
+                renderTable();
+            }
+        }
+
+        currentTurn = (currentTurn % 4) + 1;
+        if (currentTurn > 3) currentTurn = 0;
+
+        if (currentTurn === 0) {
+            setStatus(lastPlayed.length ? `輪到你出牌，需超過 ${lastPlayedBy} 的牌` : '輪到你出牌（自由出）');
+            document.getElementById('tips').innerText = '';
+            renderHand();
+        } else {
+            setTimeout(aiTurn, 900);
+        }
+    }
+
+    function showWin(msg) {
+        document.getElementById('overlayMsg').innerText = msg;
+        document.getElementById('overlay').classList.add('show');
+    }
 
     init();
 </script>
