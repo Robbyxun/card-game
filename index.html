@@ -3,146 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>大老二：修復完成版</title>
+    <title>大老二：修復版</title>
     <style>
-        body { 
-            background: #1a4d1a; background-image: radial-gradient(#2e7d32 20%, #1a4d1a 80%);
-            color: white; font-family: 'Arial', sans-serif; 
-            margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; 
-            height: 100vh; overflow: hidden; 
-        }
+        body { background: #1a4d1a; color: white; font-family: Arial, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
         .game-header { margin-top: 20px; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 20px; text-align: center; width: 85%; }
         #status { font-size: 1.2rem; font-weight: bold; color: #ffeb3b; }
-        #pattern-tips { font-size: 1rem; color: #fff; margin-top: 5px; height: 1.2rem; }
-
         .hand-container { position: absolute; bottom: 120px; left: 0; width: 100%; display: flex; justify-content: center; }
-        .hand { display: flex; justify-content: center; --card-width: 75px; --card-height: 115px; }
-
+        .hand { display: flex; justify-content: center; --card-width: 70px; }
         .card { 
-            width: var(--card-width); height: var(--card-height); 
-            background: white; border-radius: 8px; color: #333;
-            display: flex; flex-direction: column; justify-content: space-between; padding: 10px; box-sizing: border-box;
-            cursor: pointer; transition: transform 0.2s ease; margin-left: -45px;
-            box-shadow: 2px 5px 15px rgba(0,0,0,0.4); border: 1px solid #ccc;
+            width: var(--card-width); height: 105px; background: white; border-radius: 8px; color: #333;
+            display: flex; flex-direction: column; justify-content: space-between; padding: 8px; box-sizing: border-box;
+            cursor: pointer; transition: transform 0.2s; margin-left: -40px; border: 1px solid #ccc;
         }
         .card:first-child { margin-left: 0; }
         .card.red { color: #d32f2f; }
-        .card.selected { transform: translateY(-35px); box-shadow: 0 0 20px #ffeb3b; border: 2px solid #ffeb3b; }
-        
-        .card .rank-top { font-size: 1.4rem; font-weight: 900; line-height: 1; text-align: left; }
-        .card .suit-center { font-size: 2.5rem; align-self: center; margin-top: -5px; }
-        .card .rank-bottom { font-size: 1rem; font-weight: bold; align-self: flex-end; transform: rotate(180deg); }
-        
+        .card.selected { transform: translateY(-30px); box-shadow: 0 0 15px #ffeb3b; border: 2px solid #ffeb3b; }
+        .card .rank-top { font-size: 1.2rem; font-weight: bold; }
+        .card .suit-center { font-size: 2.2rem; align-self: center; }
         .controls { position: absolute; bottom: 40px; display: flex; gap: 20px; }
-        button { padding: 12px 40px; font-size: 1.1rem; cursor: pointer; border-radius: 30px; border: none; font-weight: bold; }
-        #playBtn { background: #fbc02d; color: #333; }
-        #playBtn:disabled { background: #666; color: #999; opacity: 0.5; }
+        button { padding: 12px 30px; font-size: 1rem; cursor: pointer; border-radius: 30px; border: none; font-weight: bold; }
+        #playBtn { background: #fbc02d; }
+        #playBtn:disabled { opacity: 0.5; cursor: not-allowed; }
         #passBtn { background: rgba(255,255,255,0.2); color: white; border: 2px solid white; }
-
-        @media (max-width: 600px) {
-            .hand { --card-width: 62px; --card-height: 95px; }
-            .card { margin-left: -38px; }
-        }
     </style>
 </head>
 <body>
-
-<div class="game-header">
-    <div id="status">正在發牌...</div>
-    <div id="pattern-tips"></div>
-</div>
-
-<div class="hand-container">
-    <div class="hand" id="playerHand"></div>
-</div>
-
-<div class="controls">
-    <button id="playBtn" disabled>出牌</button>
-    <button id="passBtn">Pass</button>
-</div>
+    <div class="game-header">
+        <div id="status">發牌中...</div>
+        <div id="tips" style="font-size: 0.9rem; margin-top: 5px;"></div>
+    </div>
+    <div class="hand-container"><div class="hand" id="playerHand"></div></div>
+    <div class="controls">
+        <button id="playBtn" disabled>出牌</button>
+        <button id="passBtn">Pass</button>
+    </div>
 
 <script>
-    const suitSymbols = { 'c': '♣', 'd': '♦', 'h': '♥', 's': '♠' };
-    const rankLabels = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+    const suitSym = { 'c': '♣', 'd': '♦', 'h': '♥', 's': '♠' };
+    const labels = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
     const suits = ['c', 'd', 'h', 's'];
-
     let playerHand = [];
-    let selectedIndices = new Set();
-    let isFirstTurn = true;
+    let selectedIdx = new Set();
+    let isFirst = true;
 
-    function initGame() {
-        try {
-            let deck = [];
-            for (let r = 0; r < rankLabels.length; r++) {
-                for (let s = 0; s < suits.length; s++) {
-                    deck.push({ label: rankLabels[r], suit: suits[s], rVal: r, sVal: s });
-                }
+    function init() {
+        let deck = [];
+        for (let r = 0; r < labels.length; r++) {
+            for (let s = 0; s < suits.length; s++) {
+                deck.push({ label: labels[r], suit: suits[s], rVal: r, sVal: s });
             }
-            deck.sort(() => Math.random() - 0.5);
-            playerHand = deck.slice(0, 13).sort((a, b) => (a.rVal * 4 + a.sVal) - (b.rVal * 4 + b.sVal));
-            renderHand();
-            checkFirstTurn();
-        } catch (e) {
-            console.error(e);
-            document.getElementById('status').innerText = "發生錯誤，請重新整理";
         }
+        deck.sort(() => Math.random() - 0.5);
+        playerHand = deck.slice(0, 13).sort((a, b) => (a.rVal * 4 + a.sVal) - (b.rVal * 4 + b.sVal));
+        render();
+        const has3c = playerHand.some(c => c.label === '3' && c.suit === 'c');
+        document.getElementById('status').innerText = has3c ? "你有梅花 3，請首攻" : "遊戲開始";
     }
 
-    function renderHand() {
-        const handEl = document.getElementById('playerHand');
-        handEl.innerHTML = '';
-        playerHand.forEach((card, index) => {
-            const isRed = (card.suit === 'd' || card.suit === 'h');
+    function render() {
+        const el = document.getElementById('playerHand');
+        el.innerHTML = '';
+        playerHand.forEach((c, i) => {
             const div = document.createElement('div');
-            div.className = `card ${isRed ? 'red' : ''} ${selectedIndices.has(index) ? 'selected' : ''}`;
-            div.innerHTML = `
-                <div class="rank-top">${card.label}</div>
-                <div class="suit-center">${suitSymbols[card.suit]}</div>
-                <div class="rank-bottom">${card.label}</div>
-            `;
-            div.onclick = () => toggleSelect(index);
-            handEl.appendChild(div);
+            div.className = `card ${(c.suit==='d'||c.suit==='h')?'red':''} ${selectedIdx.has(i)?'selected':''}`;
+            div.innerHTML = `<div class="rank-top">${c.label}</div><div class="suit-center">${suitSym[c.suit]}</div>`;
+            div.onclick = () => {
+                if (selectedIdx.has(i)) selectedIdx.delete(i);
+                else if (selectedIdx.size < 5) selectedIdx.add(i);
+                render();
+            };
+            el.appendChild(div);
         });
-        updatePlayButton();
+        updateBtn();
     }
 
-    function toggleSelect(index) {
-        if (selectedIndices.has(index)) selectedIndices.delete(index);
-        else if (selectedIndices.size < 5) selectedIndices.add(index);
-        renderHand();
-    }
+    function updateBtn() {
+        const sel = Array.from(selectedIdx).map(i => playerHand[i]);
+        const btn = document.getElementById('playBtn');
+        const tips = document.getElementById('tips');
+        if (sel.length === 0) { tips.innerText = ''; btn.disabled = true; return; }
 
-    const Checker = {
-        getPatternName(cards) {
-            if (cards.length === 1) return "單張";
-            if (cards.length === 2 && cards[0].label === cards[1].label) return "對子";
-            if (cards.length === 5) {
-                if (this.isFullHouse(cards)) return "葫蘆";
-                if (this.isFlush(cards) && this.isStraight(cards)) return "同花順！";
-                if (this.isFlush(cards)) return "同花";
-                if (this.isStraight(cards)) return "順子";
-            }
-            return "無效牌型";
-        },
-        isStraight(cards) {
-            const rvals = cards.map(c => c.rVal).sort((a,b)=>a-b);
-            for (let i = 0; i < 4; i++) if (rvals[i+1] !== rvals[i] + 1) return false;
-            return true;
-        },
-        isFlush(cards) { return cards.every(c => c.suit === cards[0].suit); },
-        isFullHouse(cards) {
+        let pattern = "無效";
+        if (sel.length === 1) pattern = "單張";
+        else if (sel.length === 2 && sel[0].label === sel[1].label) pattern = "對子";
+        else if (sel.length === 5) {
             const counts = {};
-            cards.forEach(c => counts[c.label] = (counts[c.label] || 0) + 1);
-            const vals = Object.values(counts);
-            return vals.includes(3) && vals.includes(2);
+            sel.forEach(c => counts[c.label] = (counts[c.label] || 0) + 1);
+            const v = Object.values(counts);
+            if (v.includes(3) && v.includes(2)) pattern = "葫蘆";
+            else if (sel.every(c => c.suit === sel[0].suit)) pattern = "同花";
         }
+        
+        tips.innerText = "牌型：" + pattern;
+        let can = (pattern !== "無效");
+        if (isFirst && can && !sel.some(c => c.label === '3' && c.suit === 'c')) can = false;
+        btn.disabled = !can;
+    }
+
+    document.getElementById('playBtn').onclick = () => {
+        playerHand = playerHand.filter((_, i) => !selectedIdx.has(i));
+        selectedIdx.clear();
+        isFirst = false;
+        document.getElementById('status').innerText = "出牌成功";
+        render();
     };
 
-    function updatePlayButton() {
-        const selectedCards = Array.from(selectedIndices).map(i => playerHand[i]);
-        const pattern = Checker.getPatternName(selectedCards);
-        const tipsEl = document.getElementById('pattern-tips');
-        tipsEl.innerText = selectedCards.length > 0 ? `牌型：${pattern}` : "";
-        let canPlay = (pattern !== "無效牌型");
-        if (isFirstTurn && canPlay) {
-            if (!selectedCards.some(c
+    document.getElementById('passBtn').onclick = () => {
+        if (isFirst) alert("首攻不能 Pass");
+        else { selectedIdx.clear(); render(); }
+    };
+
+    init();
+</script>
+</body>
+</html>
